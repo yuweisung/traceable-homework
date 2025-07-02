@@ -8,8 +8,7 @@ You should be able to run kubecl command.
 ```
 alias k = kubectl
 k cluster-info
-Kubernetes control plane is running at https://127.0.0.1:6443
-CoreDNS is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+Kubernetes control plane is running at https://52D917694A067D65C63D54F98E929D4C.gr7.us-east-1.eks.amazonaws.com
 
 To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 ```
@@ -18,8 +17,7 @@ Follow the setup.md in crAPI repo to install the crAPI in docker k8s.
 ```
 git clone git@github.com:OWASP/crAPI.git
 cd crAPI/deploy/helm
-k create ns crapi
-helm install --namespace crapi crapi . --values values.yaml --set apiGatewayServiceInstall=false
+helm install --create-namespace --namespace crapi crapi . --values values.yaml --set apiGatewayServiceInstall=false
 NAME: crapi
 LAST DEPLOYED: Mon Jun 30 12:46:23 2025
 NAMESPACE: crapi
@@ -52,6 +50,56 @@ service/mailhog-web-ingress   LoadBalancer   10.97.75.36     localhost     8025:
 service/mongodb               ClusterIP      10.105.228.83   <none>        27017/TCP                    98s
 service/postgresdb            ClusterIP      10.97.241.79    <none>        5432/TCP                     98s
 ```
+
+## setup istio gateway
+Install istio.
+```
+curl -L https://istio.io/downloadIstio | sh -\n
+cd istio-1.26.2
+bin/istioctl install --set profile=default
+```
+Create gateway and visual service pointing to crapi
+```
+kubectl apply -f - <<EOF
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: crapi-web
+  namespace: crapi
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: nginx
+      protocol: HTTP
+    hosts:
+    - "*"
+  - port:
+      number: 8025
+      name: web
+      protocol: HTTP
+    hosts:
+    - "*"
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: crapi
+  namespace: crapi
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - crapi-web
+  http:
+  - route:
+    - destination:
+        host: crapi-web.crapi.svc.cluster.local
+EOF
+```
+
 ## Postman desktop
 From postman.com, download and install postman on your desktop.
 
@@ -61,12 +109,13 @@ From postman.com, download and install postman on your desktop.
 ```
 export TOKEN=xxxxxxxxxx
 export ENV=YUWEI_SUNG
+export ENDPOINT=api.us1.traceable.ai
 ```
 2. Deploy traceable platform agent
 ```
 helm repo add traceableai https://helm.traceable.ai
 helm repo update
-helm install --namespace traceableai traceable-agent traceableai/traceable-agent --create-namespace --set token=$TOKEN --set environment=$ENV
+helm install --namespace traceableai traceable-agent traceableai/traceable-agent --create-namespace --set token=$TOKEN --set environment=$ENV --set endpoint=$ENDPOINT
 ```
 Check the status of deployment.
 ```
@@ -75,10 +124,15 @@ NAME                               READY   STATUS    RESTARTS   AGE
 traceable-agent-5765d45fc6-dz9sj   1/1     Running   0          13m
 ```
 
-## Install ebpf tracer agent (helm)
+## Inject sidecar tracer to istio ingress-gateway
 ```
-helm repo add traceableai https://helm.traceable.ai
-helm repo update
+kubectl label ns istio-system traceableai-inject-tme=enabled
+kubectl patch deployment.apps/istio-ingressgateway -p '{"spec": {"template": {"metadata": {"annotations": {"tme.traceable.ai/inject": "true"}}}}}' -n istio-system
+kubectl patch deployment.apps/istio-ingressgateway -p '{"spec": {"template": {"metadata": {"labels": {"traceableai-istio": "enabled"}}}}}' -n istio-system
+```
+
+## Install ebpf tracer agent (NOT FINISH)
+```
 helm upgrade --namespace traceableai traceable-agent traceableai/traceable-agent --set token=$TOKEN --set environment=YUWEI_SUNG --set runAsDaemonSet=false --set daemonSetMirroringEnabled=true --set ebpfCaptureEnabled=true --set ebpfRunAsPrivileged=true --set ebpfDeployOnMaster=true
 ```
 Veryif the agent pods are running.
@@ -97,6 +151,9 @@ traceable-ebpf-tracer-ds-m6cnt     1/1     Running   0          56s
 3. Run 200 iteration with 100ms delay
 
 ## Check the Traceable UI
+![image](images/datacollection1.png)
+
+![image](images/datacollection2.png)
 
 
-## Run 
+## Run PoV attack
