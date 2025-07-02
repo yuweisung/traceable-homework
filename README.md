@@ -1,22 +1,27 @@
 # Traceable Homework
 
 ## Setup k8s env (docker-desktop)
-Turn on k8s in docker desktop like this.
+Turn on k8s in docker desktop with all default settings (kubeadm).
 ![image](images/docker-k8s.png)  
 
-You should be able to run kubecl command.
+Check the connectivity using kubectl.
 ```
 alias k = kubectl
 k cluster-info
-Kubernetes control plane is running at https://52D917694A067D65C63D54F98E929D4C.gr7.us-east-1.eks.amazonaws.com
+Kubernetes control plane is running at https://127.0.0.1:6443
+CoreDNS is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
 
 To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 ```
 ## Deploy crAPI
-Follow the setup.md in crAPI repo to install the crAPI in docker k8s.
-```
-git clone git@github.com:OWASP/crAPI.git
-cd crAPI/deploy/helm
+Follow the setup.md in [crAPI repo](https://github.com/OWASP/crAPI/blob/develop/docs/setup.md#kubernetes) to install the crAPI in docker k8s.
+1. Clone the OWASP crAPI
+  ```
+  git clone git@github.com:OWASP/crAPI.git
+  cd crAPI/deploy/helm
+  ```
+2. Install the crAPI
+``` 
 helm install --create-namespace --namespace crapi crapi . --values values.yaml --set apiGatewayServiceInstall=false
 NAME: crapi
 LAST DEPLOYED: Mon Jun 30 12:46:23 2025
@@ -25,7 +30,7 @@ STATUS: deployed
 REVISION: 1
 TEST SUITE: None
 ```
-Check the status of crAPI.
+3. Check the status of crAPI.
 ```
 k get pod, svc -n crapi
 NAME                                   READY   STATUS    RESTARTS   AGE
@@ -51,14 +56,14 @@ service/mongodb               ClusterIP      10.105.228.83   <none>        27017
 service/postgresdb            ClusterIP      10.97.241.79    <none>        5432/TCP                     98s
 ```
 
-## setup istio gateway
-Install istio.
+## Setup istio gateway
+1. Install istio.
 ```
 curl -L https://istio.io/downloadIstio | sh -\n
 cd istio-1.26.2
 bin/istioctl install --set profile=default
 ```
-Create gateway and visual service pointing to crapi
+2. Create gateway and visual service pointing to crapi
 ```
 kubectl apply -f - <<EOF
 apiVersion: networking.istio.io/v1
@@ -99,12 +104,16 @@ spec:
         host: crapi-web.crapi.svc.cluster.local
 EOF
 ```
-
+3. Test the gateway access.
+```
+curl localhost:80
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/images/favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#000000"/><meta http-equiv="cache-control" content="no-cache"/><meta http-equiv="Pragma" content="no-cache"/><meta http-equiv="Expires" content="0"/><meta name="keywords" content="OWASP, API, Top 10, BOLA, IDOR, BFLA, Mass Assignment, Broken Object Level Authorization, Broken Function Level Authentication, Excessive Data Exposure, SSRF, Lack of Resources & Rate Limiting"/><meta name="description" content="completely ridiculous API (crAPI) will help you to understand the ten most critical API security risks. crAPI is intentionally vulnerable to the OWASP API Top 10, but you’ll be able to safely run it to educate/train yourself."/><link rel="apple-touch-icon" href="/images/logo192.png"/><link rel="manifest" href="/manifest.json"/><title>crAPI</title><script defer="defer" src="/static/js/main.86f8e427.js"></script><link href="/static/css/main.2a6fe1eb.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>
+```
 ## Postman desktop
 From postman.com, download and install postman on your desktop.
 
 ## Install traceable platform agent (helm)
-1. Create an agent token on traceable and set env.
+1. Create an agent token on traceable and set the environment variables.
 ![image](images/traceable-token.png)
 ```
 export TOKEN=xxxxxxxxxx
@@ -117,7 +126,7 @@ helm repo add traceableai https://helm.traceable.ai
 helm repo update
 helm install --namespace traceableai traceable-agent traceableai/traceable-agent --create-namespace --set token=$TOKEN --set environment=$ENV --set endpoint=$ENDPOINT
 ```
-Check the status of deployment.
+3. Check the status of deployment.
 ```
 k get pod -n traceableai
 NAME                               READY   STATUS    RESTARTS   AGE
@@ -125,10 +134,34 @@ traceable-agent-5765d45fc6-dz9sj   1/1     Running   0          13m
 ```
 
 ## Inject sidecar tracer to istio ingress-gateway
+1. Add 'traceableai-inject-tme=enabled" to istio-ingress-gateway namespace.
 ```
 kubectl label ns istio-system traceableai-inject-tme=enabled
+```
+2. Add "tme.traceable.ai/inject":"true" annotations to ingress-gateway deployment.
+```
 kubectl patch deployment.apps/istio-ingressgateway -p '{"spec": {"template": {"metadata": {"annotations": {"tme.traceable.ai/inject": "true"}}}}}' -n istio-system
+```
+3. Add "traceableai-istio":"enabled" annotation to ingress-gateway deployment.
+```
 kubectl patch deployment.apps/istio-ingressgateway -p '{"spec": {"template": {"metadata": {"labels": {"traceableai-istio": "enabled"}}}}}' -n istio-system
+```
+4. Restart the ingressgateway (or kill the pod). After the ingress-gateway restarted, you should see two containers in the pod.
+```
+k describe pod istio-ingressgateway-54ccb7844f-m7f6h -n istio-system | grep -A5 'tme'
+                  tme.traceable.ai/inject: true
+                  traffic.kuma.io/exclude-outbound-ports: 5442,5442
+                  traffic.sidecar.istio.io/excludeOutboundPorts: 5442,5442
+Status:           Running
+IP:               10.1.0.126
+IPs:
+--
+  tme:
+    Container ID:  docker://ea2eedfcd8b2d2b22571c3db4d3d4e85b93c0dd9a48e05e86de8096c496f665a
+    Image:         docker.io/traceableai/traceable-agent:1.57.2
+    Image ID:      docker-pullable://traceableai/traceable-agent@sha256:e2fba88ba0515c1bb85a0e5476f8d771707c58db08dd0133e3fa61c25152ce4e
+    Port:          <none>
+    Host Port:     <none>
 ```
 
 ## Install ebpf tracer agent (NOT FINISH)
@@ -151,9 +184,12 @@ traceable-ebpf-tracer-ds-m6cnt     1/1     Running   0          56s
 3. Run 200 iteration with 100ms delay
 
 ## Check the Traceable UI
+1. Once the sidecar created, you should find the Agent in Settings/Data Collection.
 ![image](images/datacollection1.png)
-
 ![image](images/datacollection2.png)
 
-
 ## Run PoV attack
+1. Load the pov.json attached to Postman and run the whole collction to simulate the attacks.
+![image](images/pov-attack.png)
+
+## Check the Traceable UI
