@@ -164,7 +164,7 @@ IPs:
     Host Port:     <none>
 ```
 
-## Install ebpf tracer agent (NOT FINISH)
+## Install ebpf tracer agent (NOT FINISH YET)
 ```
 helm upgrade --namespace traceableai traceable-agent traceableai/traceable-agent --set token=$TOKEN --set environment=YUWEI_SUNG --set runAsDaemonSet=false --set daemonSetMirroringEnabled=true --set ebpfCaptureEnabled=true --set ebpfRunAsPrivileged=true --set ebpfDeployOnMaster=true
 ```
@@ -193,3 +193,13 @@ traceable-ebpf-tracer-ds-m6cnt     1/1     Running   0          56s
 ![image](images/pov-attack.png)
 
 ## Check the Traceable UI
+1. Catalog/API Discovery/API Activity
+![image](images/api-activity.png)
+2. Protection/Web Application Protection
+![image](images/webapp-protection.png)
+3. Analytics Explorer
+![image](images/analytics-explorer.png)
+
+## Next step
+* How to add analytics?
+* How to take action (protection) or modify the current policy from warning to action like rate-limit?
