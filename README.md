@@ -204,3 +204,5 @@ traceable-ebpf-tracer-ds-m6cnt     1/1     Running   0          56s
 * How to add analytics?
 * How to take action (protection) or modify the current policy from warning to action like rate-limit?
 * how to run test with istio sidecar mode?
+* learn issue policies
+![image](images/issue-policies.png)
