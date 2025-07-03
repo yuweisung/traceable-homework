@@ -2,3 +2,4 @@ runAsDaemonSet: false
 daemonSetMirroringEnabled: true
 ebpfCaptureEnabled: true
 ebpfRunAsPrivileged: true
+daemonSetMirrorAllNamespaces: true

@@ -13,6 +13,15 @@ CoreDNS is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/servi
 
 To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 ```
+
+## Create an EKS cluster
+```
+# show the role who will create the cluster
+aws sts get-caller-identity
+# create the cluster
+eksctl create cluster -f eks/ubuntu.yaml
+```
+
 ## Deploy crAPI
 Follow the setup.md in [crAPI repo](https://github.com/OWASP/crAPI/blob/develop/docs/setup.md#kubernetes) to install the crAPI in docker k8s.
 1. Clone the OWASP crAPI
@@ -165,21 +174,30 @@ IPs:
 ```
 
 ## Install ebpf tracer agent (NOT FINISH YET)
+Be aware of namespaces where the tracer will monitor. Use daemonSetMirrorAllNamespaces=true to monitor other namespace. I believe there should be a configMap property to list namespaces.
 ```
-helm upgrade --namespace traceableai traceable-agent traceableai/traceable-agent --set token=$TOKEN --set environment=YUWEI_SUNG --set runAsDaemonSet=false --set daemonSetMirroringEnabled=true --set ebpfCaptureEnabled=true --set ebpfRunAsPrivileged=true --set ebpfDeployOnMaster=true
+helm install --namespace traceableai traceable-agent traceableai/traceable-agent --set token=$TOKEN --set environment=$ENV --set runAsDaemonSet=false --set daemonSetMirroringEnabled=true --set daemonSetMirrorAllNamespaces=true --set ebpfCaptureEnabled=true --set ebpfRunAsPrivileged=true --set ebpfDeployOnMaster=true --set endpoint=$ENDPOINT
+
 ```
 Veryif the agent pods are running.
 ```
 kubectl get pods -n traceableai
-NAME                               READY   STATUS    RESTARTS   AGE
-traceable-agent-764496c58c-s62gq   1/1     Running   0          56s
-traceable-ebpf-tracer-ds-m6cnt     1/1     Running   0          56s
+NAME                              READY   STATUS        RESTARTS   AGE
+traceable-agent-bc79b55dd-m6j56   1/1     Terminating   0          66s
+traceable-agent-f96b696c6-hpbpn   1/1     Running       0          20s
+traceable-ebpf-tracer-ds-7h6m5    1/1     Running       0          20s
+traceable-ebpf-tracer-ds-r4l4x    1/1     Running       0          20s
 ```
 
 ## Learning crAPI using Postman
-1. Load the attached postman json and env json files to Postman.
+1. Load the attached postman json and env json files to Postman. 
 ![image](images/postman-crapi.png)
-2. Change the api endpoint port to 80.
+2. Change the api endpoint url and port according to the loadbalancer address in svc.
+```
+k get svc crapi-web -n crapi
+NAME        TYPE           CLUSTER-IP      EXTERNAL-IP                                                               PORT(S)                      AGE
+crapi-web   LoadBalancer   10.100.139.94   a2e286f1a203b4390b3aff18067eb62d-1544345541.us-east-1.elb.amazonaws.com   80:30080/TCP,443:30443/TCP   14m
+```
 ![image](images/postman-env.png)
 3. Run 200 iteration with 100ms delay
 
@@ -193,12 +211,15 @@ traceable-ebpf-tracer-ds-m6cnt     1/1     Running   0          56s
 ![image](images/pov-attack.png)
 
 ## Check the Traceable UI
+0. Turn on AI feature
+![image](images/ai-feature.png)
 1. Catalog/API Discovery/API Activity
 ![image](images/api-activity.png)
 2. Protection/Web Application Protection
 ![image](images/webapp-protection.png)
 3. Analytics Explorer
 ![image](images/analytics-explorer.png)
+
 
 ## Next step
 * How to add analytics?
