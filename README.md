@@ -146,7 +146,12 @@ Note that if you choose istio sidecar, you just need to install TPA deployment.
 ```
 helm repo add traceableai https://helm.traceable.ai
 helm repo update
-helm install --namespace traceableai traceable-agent traceableai/traceable-agent --create-namespace --set token=$TOKEN --set environment=$ENV --set endpoint=$ENDPOINT
+helm install traceable-agent traceableai/traceable-agent \
+     --namespace traceableai \
+     --create-namespace \
+     --set token=$TOKEN \
+     --set environment=$ENV \
+     --set endpoint=$ENDPOINT
 ```
 3. Check the status of deployment.
 ```
@@ -162,11 +167,15 @@ kubectl label ns istio-system traceableai-inject-tme=enabled
 ```
 2. Add "tme.traceable.ai/inject":"true" annotations to ingress-gateway deployment.
 ```
-kubectl patch deployment.apps/istio-ingressgateway -p '{"spec": {"template": {"metadata": {"annotations": {"tme.traceable.ai/inject": "true"}}}}}' -n istio-system
+kubectl patch deployment.apps/istio-ingressgateway \
+    -p '{"spec": {"template": {"metadata": {"annotations": {"tme.traceable.ai/inject": "true"}}}}}' \
+    -n istio-system
 ```
 3. Add "traceableai-istio":"enabled" annotation to ingress-gateway deployment.
 ```
-kubectl patch deployment.apps/istio-ingressgateway -p '{"spec": {"template": {"metadata": {"labels": {"traceableai-istio": "enabled"}}}}}' -n istio-system
+kubectl patch deployment.apps/istio-ingressgateway \
+    -p '{"spec": {"template": {"metadata": {"labels": {"traceableai-istio": "enabled"}}}}}' \
+    -n istio-system
 ```
 4. Restart the ingressgateway (or kill the pod). After the ingress-gateway restarted, you should see two containers in the pod.
 ```
@@ -189,7 +198,9 @@ IPs:
 Since istio sidecar is "edge" that only filter the traffic in and out of the gateway. It will be useful to have a java sidecar injected to the crAPI pods. 
 1. Inject the java tracer agent to a deployment.
 ```
-kubectl patch deployment.apps/crapi-web -p '{"spec": {"template": {"metadata": {"annotations": {"java.traceable.ai/inject": "true"}}}}}' -n crapi
+kubectl patch deployment.apps/crapi-web \
+    -p '{"spec": {"template": {"metadata": {"annotations": {"java.traceable.ai/inject": "true"}}}}}' \
+    -n crapi
 ```
 2. Label the crapi namespace.
 ```
@@ -207,7 +218,8 @@ kubectl get po -n traceableai
 ## Install ebpf tracer agent
 Be aware of namespaces where the tracer will monitor. Use daemonSetMirrorAllNamespaces=true to monitor other namespace. I believe there should be a configMap property to list namespaces.
 ```
-helm install --namespace traceableai traceable-agent traceableai/traceable-agent \
+helm install traceable-agent traceableai/traceable-agent \
+      --namespace traceableai \
       --set token=$TOKEN \
       --set environment=$ENV \
       --set runAsDaemonSet=false \
