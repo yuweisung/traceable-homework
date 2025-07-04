@@ -1,6 +1,6 @@
 # Traceable Homework
 
-## Setup docker desktop
+## Option 1: Setup docker desktop
 Turn on k8s in docker desktop with all default settings (kubeadm).
 ![image](images/docker-k8s.png)  
 
@@ -14,7 +14,7 @@ CoreDNS is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/servi
 To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 ```
 
-## Create an EKS cluster
+## Option 2: Create an EKS cluster
 You can use AWS console or eksctl to create an basic EKS env. Be sure to add csi and vpc-cni addons. 
 ```
 # show the role who will create the cluster
@@ -133,12 +133,13 @@ curl localhost:80
 From postman.com, [download](https://www.postman.com/downloads/) and install postman on your desktop.
 
 ## Install traceable platform agent (helm)
-1. Create an agent token on traceable and set the environment variables.
+1. Create an agent token on traceable and set the environment variables. If you want to protect a specific namespace, you can specify NAMESPACE env variable. In this case, it is 'crapi'.
 ![image](images/traceable-token.png)
 ```
 export TOKEN=xxxxxxxxxx
 export ENV=YUWEI_SUNG
 export ENDPOINT=api.us1.traceable.ai
+export NAMESPACE=crapi
 ```
 2. Deploy traceable platform agent
 Note that if you choose istio sidecar, you just need to install TPA deployment. 
@@ -183,6 +184,24 @@ IPs:
     Image ID:      docker-pullable://traceableai/traceable-agent@sha256:e2fba88ba0515c1bb85a0e5476f8d771707c58db08dd0133e3fa61c25152ce4e
     Port:          <none>
     Host Port:     <none>
+```
+## Optional: JAVA sidecar
+Since istio sidecar is "edge" that only filter the traffic in and out of the gateway. It will be useful to have a java sidecar injected to the crAPI pods. 
+1. Inject the java tracer agent to a deployment.
+```
+kubectl patch deployment.apps/crapi-web -p '{"spec": {"template": {"metadata": {"annotations": {"java.traceable.ai/inject": "true"}}}}}' -n crapi
+```
+2. Label the crapi namespace.
+```
+kubectl label namespace $NAMESPACE traceableai-inject-java=enabled
+```
+3. Rolling restart the deployment or kill the pod.
+```
+kubectl rollout restart deployment crapi-web -n crapi
+```
+4. Verify the agent is running
+```
+kubectl get po -n traceableai
 ```
 
 ## Install ebpf tracer agent
