@@ -1,6 +1,6 @@
 # Traceable Homework
 
-## Setup k8s env (docker-desktop)
+## Setup docker desktop
 Turn on k8s in docker desktop with all default settings (kubeadm).
 ![image](images/docker-k8s.png)  
 
@@ -15,13 +15,21 @@ To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
 ```
 
 ## Create an EKS cluster
+You can use AWS console or eksctl to create an basic EKS env. Be sure to add csi and vpc-cni addons. 
 ```
 # show the role who will create the cluster
 aws sts get-caller-identity
 # create the cluster
 eksctl create cluster -f eks/ubuntu.yaml
 ```
+After eks deployed, check the kubectl config.
+```
+k cluster-info
+Kubernetes control plane is running at https://BEF627996D888669320EEBC3614EC175.gr7.us-east-1.eks.amazonaws.com
+CoreDNS is running at https://BEF627996D888669320EEBC3614EC175.gr7.us-east-1.eks.amazonaws.com/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
 
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+```
 ## Deploy crAPI
 Follow the setup.md in [crAPI repo](https://github.com/OWASP/crAPI/blob/develop/docs/setup.md#kubernetes) to install the crAPI in docker k8s.
 1. Clone the OWASP crAPI
@@ -29,7 +37,7 @@ Follow the setup.md in [crAPI repo](https://github.com/OWASP/crAPI/blob/develop/
   git clone git@github.com:OWASP/crAPI.git
   cd crAPI/deploy/helm
   ```
-2. Install the crAPI
+2. Install the crAPI services
 ``` 
 helm install --create-namespace --namespace crapi crapi . --values values.yaml --set apiGatewayServiceInstall=false
 NAME: crapi
@@ -65,6 +73,8 @@ service/mongodb               ClusterIP      10.105.228.83   <none>        27017
 service/postgresdb            ClusterIP      10.97.241.79    <none>        5432/TCP                     98s
 ```
 
+crAPI has a microservice architecture comprising of id provider, webapp, community, workshop, nosql db and rdb.  The API contains many vulnerabilities and is a good target for security practices.  We will use Postman to simulate attacks to crAPI service and use Traceable sidecar and ebpf tracer to mirror those attacks.  Those calls will be sent to Traceable.ai by the Traceable Platform Agent (TPA). 
+
 ## Setup istio gateway
 1. Install istio.
 ```
@@ -72,6 +82,7 @@ curl -L https://istio.io/downloadIstio | sh -\n
 cd istio-1.26.2
 bin/istioctl install --set profile=default
 ```
+
 2. Create gateway and visual service pointing to crapi
 ```
 kubectl apply -f - <<EOF
@@ -119,7 +130,7 @@ curl localhost:80
 <!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/images/favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#000000"/><meta http-equiv="cache-control" content="no-cache"/><meta http-equiv="Pragma" content="no-cache"/><meta http-equiv="Expires" content="0"/><meta name="keywords" content="OWASP, API, Top 10, BOLA, IDOR, BFLA, Mass Assignment, Broken Object Level Authorization, Broken Function Level Authentication, Excessive Data Exposure, SSRF, Lack of Resources & Rate Limiting"/><meta name="description" content="completely ridiculous API (crAPI) will help you to understand the ten most critical API security risks. crAPI is intentionally vulnerable to the OWASP API Top 10, but you’ll be able to safely run it to educate/train yourself."/><link rel="apple-touch-icon" href="/images/logo192.png"/><link rel="manifest" href="/manifest.json"/><title>crAPI</title><script defer="defer" src="/static/js/main.86f8e427.js"></script><link href="/static/css/main.2a6fe1eb.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>
 ```
 ## Postman desktop
-From postman.com, download and install postman on your desktop.
+From postman.com, [download](https://www.postman.com/downloads/) and install postman on your desktop.
 
 ## Install traceable platform agent (helm)
 1. Create an agent token on traceable and set the environment variables.
@@ -130,6 +141,7 @@ export ENV=YUWEI_SUNG
 export ENDPOINT=api.us1.traceable.ai
 ```
 2. Deploy traceable platform agent
+Note that if you choose istio sidecar, you just need to install TPA deployment. 
 ```
 helm repo add traceableai https://helm.traceable.ai
 helm repo update
@@ -141,7 +153,7 @@ k get pod -n traceableai
 NAME                               READY   STATUS    RESTARTS   AGE
 traceable-agent-5765d45fc6-dz9sj   1/1     Running   0          13m
 ```
-
+You can confirm the connection is correct by the traceable-agent log or Traceable UI.
 ## Inject sidecar tracer to istio ingress-gateway
 1. Add 'traceableai-inject-tme=enabled" to istio-ingress-gateway namespace.
 ```
@@ -173,13 +185,21 @@ IPs:
     Host Port:     <none>
 ```
 
-## Install ebpf tracer agent (NOT FINISH YET)
+## Install ebpf tracer agent
 Be aware of namespaces where the tracer will monitor. Use daemonSetMirrorAllNamespaces=true to monitor other namespace. I believe there should be a configMap property to list namespaces.
 ```
-helm install --namespace traceableai traceable-agent traceableai/traceable-agent --set token=$TOKEN --set environment=$ENV --set runAsDaemonSet=false --set daemonSetMirroringEnabled=true --set daemonSetMirrorAllNamespaces=true --set ebpfCaptureEnabled=true --set ebpfRunAsPrivileged=true --set ebpfDeployOnMaster=true --set endpoint=$ENDPOINT
-
+helm install --namespace traceableai traceable-agent traceableai/traceable-agent \
+      --set token=$TOKEN \
+      --set environment=$ENV \
+      --set runAsDaemonSet=false \
+      --set daemonSetMirroringEnabled=true \
+      --set daemonSetMirrorAllNamespaces=true \
+      --set ebpfCaptureEnabled=true \
+      --set ebpfRunAsPrivileged=true \
+      --set ebpfDeployOnMaster=true \
+      --set endpoint=$ENDPOINT
 ```
-Veryif the agent pods are running.
+After the deployment, veryif the agent pods are running.
 ```
 kubectl get pods -n traceableai
 NAME                              READY   STATUS        RESTARTS   AGE
@@ -199,14 +219,14 @@ NAME        TYPE           CLUSTER-IP      EXTERNAL-IP                          
 crapi-web   LoadBalancer   10.100.139.94   a2e286f1a203b4390b3aff18067eb62d-1544345541.us-east-1.elb.amazonaws.com   80:30080/TCP,443:30443/TCP   14m
 ```
 ![image](images/postman-env.png)
-3. Run 200 iteration with 100ms delay
+3. Run 200 iteration with 100ms delay (Learning)
 
 ## Check the Traceable UI
-1. Once the sidecar created, you should find the Agent in Settings/Data Collection.
+1. Once the sidecar or ebpf tracer created, you should find the Agent in Settings/Data Collection.
 ![image](images/datacollection1.png)
 ![image](images/datacollection2.png)
 
-## Run PoV attack
+## Run the attack API calls
 1. Load the pov.json attached to Postman and run the whole collction to simulate the attacks.
 ![image](images/pov-attack.png)
 
