@@ -243,14 +243,24 @@ traceable-ebpf-tracer-ds-r4l4x    1/1     Running       0          20s
 ## Learning crAPI using Postman
 1. Load the attached postman json and env json files to Postman. 
 ![image](images/postman-crapi.png)
-2. Change the api endpoint url and port according to the loadbalancer address in svc.
+2. Change the api endpoint url and port according to the loadbalancer address in svc. Note that the api port is 80 and the mailhog ingress port is 8025.
 ```
-k get svc crapi-web -n crapi
+k get svc  -n crapi
 NAME        TYPE           CLUSTER-IP      EXTERNAL-IP                                                               PORT(S)                      AGE
-crapi-web   LoadBalancer   10.100.139.94   a2e286f1a203b4390b3aff18067eb62d-1544345541.us-east-1.elb.amazonaws.com   80:30080/TCP,443:30443/TCP   14m
+NAME                  TYPE           CLUSTER-IP       EXTERNAL-IP                                                               PORT(S)                      AGE
+crapi-community       ClusterIP      10.100.80.102    <none>                                                                    8087/TCP                     3d14h
+crapi-identity        ClusterIP      10.100.175.25    <none>                                                                    8080/TCP                     3d14h
+crapi-web             LoadBalancer   10.100.139.94    a2e286f1a203b4390b3aff18067eb62d-1544345541.us-east-1.elb.amazonaws.com   80:30080/TCP,443:30443/TCP   3d14h
+crapi-workshop        ClusterIP      10.100.74.172    <none>                                                                    8000/TCP                     3d14h
+mailhog               ClusterIP      10.100.138.166   <none>                                                                    1025/TCP                     3d14h
+mailhog-web           ClusterIP      10.100.74.217    <none>                                                                    8025/TCP                     3d14h
+mailhog-web-ingress   LoadBalancer   10.100.10.176    a2ff9bd88b757435581736b3c50392f8-278100266.us-east-1.elb.amazonaws.com    8025:30687/TCP               3d14h
+mongodb               ClusterIP      10.100.52.155    <none>                                                                    27017/TCP                    3d14h
+postgresdb            ClusterIP      10.100.243.134   <none>                                                                    5432/TCP                     3d14h
 ```
 ![image](images/postman-env.png)
-3. Run 200 iteration with 100ms delay (Learning)
+3. upload the crapi [openapi spec](https://github.com/OWASP/crAPI/blob/develop/openapi-spec/crapi-openapi-spec.json) json file to Traceableai UI.
+4. Run 200 iteration with 100ms delay (Learning)
 
 ## Check the Traceable UI
 1. Once the sidecar or ebpf tracer created, you should find the Agent in Settings/Data Collection.
