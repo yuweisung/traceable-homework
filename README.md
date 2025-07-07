@@ -259,7 +259,7 @@ mongodb               ClusterIP      10.100.52.155    <none>                    
 postgresdb            ClusterIP      10.100.243.134   <none>                                                                    5432/TCP                     3d14h
 ```
 ![image](images/postman-env.png)
-3. upload the crapi [openapi spec](https://github.com/OWASP/crAPI/blob/develop/openapi-spec/crapi-openapi-spec.json) json file to Traceableai UI.
+3. upload the crapi [openapi spec](https://github.com/OWASP/crAPI/blob/develop/openapi-spec/crapi-openapi-spec.json) json file to Traceableai UI (Catalog -> API Documentation).
 4. Run 200 iteration with 100ms delay (Learning)
 
 ## Check the Traceable UI
